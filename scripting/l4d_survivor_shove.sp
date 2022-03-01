@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION 		"1.11"
+#define PLUGIN_VERSION 		"1.12"
 
 /*======================================================================================
 	Plugin Info:
@@ -32,6 +32,9 @@
 ========================================================================================
 	Change Log:
 
+1.12 (01-Mar-2022)
+	- Added cvar "l4d_survivor_shove_bots" to target who can be shoved. Requested by "TrueDarkness".
+
 1.11 (18-Sep-2021)
 	- Now blocks shoving when holding a "First Aid Kit", "Pain Pills" or "Adrenaline". Requested by "Eocene".
 	- May sometimes still be shoved when transferring "Pain Pills" or "Adrenaline" since the game delays the event based on distance.
@@ -39,7 +42,7 @@
 
 	- Now blocks shoving when holding a Grenade, Upgrade Ammo or a Defibrillator when allowed to transfer in "Gear Transfer" plugins "l4d_gear_transfer_types_real" cvar list.
 
-	- When using "Gear Transfer" plugin recommend updating to 2.18 or newer to fix compatibility issues.
+	- When using "Gear Transfer" plugin recommend updating to 2.17 or newer to fix compatibility issues.
 
 1.10 (25-Jul-2021)
 	- Now automatically detects "Gear Transfer" plugin and prevents shoving if using an item that can be transferred. Requested by "AI0702".
@@ -103,7 +106,7 @@
 #define GAMEDATA			"l4d_survivor_shove"
 
 
-ConVar g_hCvarAllow, g_hCvarMPGameMode, g_hCvarModes, g_hCvarModesOff, g_hCvarModesTog, g_hCvarDelay, g_hCvarFlags, g_hCvarStart, g_hCvarVoca, g_hGearTransferReal;
+ConVar g_hCvarAllow, g_hCvarMPGameMode, g_hCvarModes, g_hCvarModesOff, g_hCvarModesTog, g_hCvarBots, g_hCvarDelay, g_hCvarFlags, g_hCvarStart, g_hCvarVoca, g_hGearTransferReal;
 bool g_bCvarAllow, g_bMapStarted, g_bLateLoad, g_bLeft4Dead2, g_bGearTransfer, g_bCanShove[MAXPLAYERS + 1] = {true, ...};
 float g_fTimeout[MAXPLAYERS + 1];
 Handle g_hConfStagger;
@@ -220,6 +223,7 @@ public void OnPluginStart()
 
 	// CVARS
 	g_hCvarAllow = CreateConVar(	"l4d_survivor_shove_allow",			"1",			"0=Plugin off, 1=Plugin on.", CVAR_FLAGS );
+	g_hCvarBots = CreateConVar(		"l4d_survivor_shove_bots",			"0",			"Who can be shoved. 0=Everyone. 1=Bots only. 2-Humans only.", CVAR_FLAGS );
 	g_hCvarDelay = CreateConVar(	"l4d_survivor_shove_delay",			"0",			"0=No timeout. How many seconds until someone can shove again.", CVAR_FLAGS, true, 0.0 );
 	g_hCvarFlags = CreateConVar(	"l4d_survivor_shove_flags",			"z",			"Empty string = All. Players with one of these flags have access to the shove feature.", CVAR_FLAGS );
 	g_hCvarStart = CreateConVar(	"l4d_survivor_shove_start",			"1",			"0=Off. 1=On. Should shoving be turned on or off for players when they join.", CVAR_FLAGS );
@@ -591,8 +595,21 @@ public void Event_WeaponDrop(Event event, const char[] name, bool dontBroadcast)
 
 public void Event_PlayerShoved(Event event, const char[] name, bool dontBroadcast)
 {
-	int client = event.GetInt("attacker");
 	int userid = event.GetInt("userid");
+
+	int bots = g_hCvarBots.IntValue;
+	if( bots )
+	{
+		int target = GetClientOfUserId(userid);
+		if( IsFakeClient(target) )
+		{
+			if( bots == 2 ) return; // Humans only
+		} else {
+			if( bots == 1 ) return; // Bots only
+		}
+	}
+
+	int client = event.GetInt("attacker");
 
 	DataPack hPack = new DataPack();
 	hPack.WriteCell(client);
