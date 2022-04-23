@@ -1,6 +1,6 @@
 /*
 *	Survivor Shove
-*	Copyright (C) 2021 Silvers
+*	Copyright (C) 2022 Silvers
 *
 *	This program is free software: you can redistribute it and/or modify
 *	it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION 		"1.12"
+#define PLUGIN_VERSION 		"1.13"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+1.13 (23-Apr-2022)
+	- Fixed an error when the "Gear Transfer" plugin is not used.
 
 1.12 (01-Mar-2022)
 	- Added cvar "l4d_survivor_shove_bots" to target who can be shoved. Requested by "TrueDarkness".
@@ -379,7 +382,7 @@ public void OnConfigsExecuted()
 	if( g_hGearTransferReal == null )
 	{
 		g_hGearTransferReal = FindConVar("l4d_gear_transfer_types_real");
-		g_hGearTransferReal.AddChangeHook(ConVarChanged_Gear);
+		if( g_hGearTransferReal != null ) g_hGearTransferReal.AddChangeHook(ConVarChanged_Gear);
 	}
 
 	IsAllowed();
@@ -403,19 +406,22 @@ void GetGearTransferCvar()
 	g_smBlocked.SetValue("weapon_first_aid_kit", true);
 
 	// Block items Gear Transfer allows to transfer
-	g_iGearTypes = GetEnum(g_hGearTransferReal);
-
-	if( g_iGearTypes )
+	if( g_hGearTransferReal != null )
 	{
-		if( g_iGearTypes & TYPE_MOLO )  		g_smBlocked.SetValue("weapon_molotov", true);
-		if( g_iGearTypes & TYPE_PIPE )  		g_smBlocked.SetValue("weapon_pipe_bomb", true);
+		g_iGearTypes = GetEnum(g_hGearTransferReal);
 
-		if( g_bLeft4Dead2 )
+		if( g_iGearTypes )
 		{
-			if( g_iGearTypes & TYPE_VOMIT )		g_smBlocked.SetValue("weapon_vomitjar", true);
-			if( g_iGearTypes & TYPE_EXPLO )		g_smBlocked.SetValue("weapon_upgradepack_explosive", true);
-			if( g_iGearTypes & TYPE_INCEN )		g_smBlocked.SetValue("weapon_upgradepack_incendiary", true);
-			if( g_iGearTypes & TYPE_DEFIB )		g_smBlocked.SetValue("weapon_defibrillator", true);
+			if( g_iGearTypes & TYPE_MOLO )  		g_smBlocked.SetValue("weapon_molotov", true);
+			if( g_iGearTypes & TYPE_PIPE )  		g_smBlocked.SetValue("weapon_pipe_bomb", true);
+
+			if( g_bLeft4Dead2 )
+			{
+				if( g_iGearTypes & TYPE_VOMIT )		g_smBlocked.SetValue("weapon_vomitjar", true);
+				if( g_iGearTypes & TYPE_EXPLO )		g_smBlocked.SetValue("weapon_upgradepack_explosive", true);
+				if( g_iGearTypes & TYPE_INCEN )		g_smBlocked.SetValue("weapon_upgradepack_incendiary", true);
+				if( g_iGearTypes & TYPE_DEFIB )		g_smBlocked.SetValue("weapon_defibrillator", true);
+			}
 		}
 	}
 }
