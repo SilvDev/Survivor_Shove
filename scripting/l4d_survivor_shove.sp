@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION 		"1.13"
+#define PLUGIN_VERSION 		"1.14"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+1.14 (14-Jul-2022)
+	- Added cvar "l4d_survivor_shove_keys" to control the keybind used for shoving. Requested by "yabi".
 
 1.13 (23-Apr-2022)
 	- Fixed an error when the "Gear Transfer" plugin is not used.
@@ -109,7 +112,7 @@
 #define GAMEDATA			"l4d_survivor_shove"
 
 
-ConVar g_hCvarAllow, g_hCvarMPGameMode, g_hCvarModes, g_hCvarModesOff, g_hCvarModesTog, g_hCvarBots, g_hCvarDelay, g_hCvarFlags, g_hCvarStart, g_hCvarVoca, g_hGearTransferReal;
+ConVar g_hCvarAllow, g_hCvarMPGameMode, g_hCvarModes, g_hCvarModesOff, g_hCvarModesTog, g_hCvarBots, g_hCvarDelay, g_hCvarFlags, g_hCvarKey, g_hCvarStart, g_hCvarVoca, g_hGearTransferReal;
 bool g_bCvarAllow, g_bMapStarted, g_bLateLoad, g_bLeft4Dead2, g_bGearTransfer, g_bCanShove[MAXPLAYERS + 1] = {true, ...};
 float g_fTimeout[MAXPLAYERS + 1];
 Handle g_hConfStagger;
@@ -208,7 +211,7 @@ public void OnPluginStart()
 		BuildPath(Path_SM, sPath, sizeof(sPath), "gamedata/%s.txt", GAMEDATA);
 		if( FileExists(sPath) == false ) SetFailState("\n==========\nMissing required file: \"%s\".\nRead installation instructions again.\n==========", sPath);
 
-		Handle hGameData = LoadGameConfigFile(GAMEDATA);
+		GameData hGameData = new GameData(GAMEDATA);
 		if( hGameData == null ) SetFailState("Failed to load \"%s.txt\" gamedata.", GAMEDATA);
 
 		StartPrepSDKCall(SDKCall_Entity);
@@ -229,6 +232,7 @@ public void OnPluginStart()
 	g_hCvarBots = CreateConVar(		"l4d_survivor_shove_bots",			"0",			"Who can be shoved. 0=Everyone. 1=Bots only. 2-Humans only.", CVAR_FLAGS );
 	g_hCvarDelay = CreateConVar(	"l4d_survivor_shove_delay",			"0",			"0=No timeout. How many seconds until someone can shove again.", CVAR_FLAGS, true, 0.0 );
 	g_hCvarFlags = CreateConVar(	"l4d_survivor_shove_flags",			"z",			"Empty string = All. Players with one of these flags have access to the shove feature.", CVAR_FLAGS );
+	g_hCvarKey = CreateConVar(		"l4d_survivor_shove_keys",			"1",			"1=Shove. 2=Shove + Use. Which keys to shove players.", CVAR_FLAGS );
 	g_hCvarStart = CreateConVar(	"l4d_survivor_shove_start",			"1",			"0=Off. 1=On. Should shoving be turned on or off for players when they join.", CVAR_FLAGS );
 	g_hCvarVoca = CreateConVar(		"l4d_survivor_shove_vocalize",		"50",			"0=Off. The chance out of 100 for the survivor being shoved to scream.", CVAR_FLAGS );
 	g_hCvarModes = CreateConVar(	"l4d_survivor_shove_modes",			"",				"Turn on the plugin in these game modes, separate by commas (no spaces). (Empty = all).", CVAR_FLAGS );
@@ -261,7 +265,7 @@ public void OnPluginStart()
 // ====================================================================================================
 //					COMMANDS
 // ====================================================================================================
-public Action CmdShove(int client, int args)
+Action CmdShove(int client, int args)
 {
 	if( !client )
 	{
@@ -389,7 +393,7 @@ public void OnConfigsExecuted()
 	GetGearTransferCvar();
 }
 
-public void ConVarChanged_Gear(Handle convar, const char[] oldValue, const char[] newValue)
+void ConVarChanged_Gear(Handle convar, const char[] oldValue, const char[] newValue)
 {
 	GetGearTransferCvar();
 }
@@ -412,8 +416,8 @@ void GetGearTransferCvar()
 
 		if( g_iGearTypes )
 		{
-			if( g_iGearTypes & TYPE_MOLO )  		g_smBlocked.SetValue("weapon_molotov", true);
-			if( g_iGearTypes & TYPE_PIPE )  		g_smBlocked.SetValue("weapon_pipe_bomb", true);
+			if( g_iGearTypes & TYPE_MOLO )			g_smBlocked.SetValue("weapon_molotov", true);
+			if( g_iGearTypes & TYPE_PIPE )			g_smBlocked.SetValue("weapon_pipe_bomb", true);
 
 			if( g_bLeft4Dead2 )
 			{
@@ -442,7 +446,7 @@ int GetEnum(ConVar cvar)
 	return val;
 }
 
-public void ConVarChanged_Allow(Handle convar, const char[] oldValue, const char[] newValue)
+void ConVarChanged_Allow(Handle convar, const char[] oldValue, const char[] newValue)
 {
 	IsAllowed();
 }
@@ -537,7 +541,7 @@ bool IsAllowedGameMode()
 	return true;
 }
 
-public void OnGamemode(const char[] output, int caller, int activator, float delay)
+void OnGamemode(const char[] output, int caller, int activator, float delay)
 {
 	if( strcmp(output, "OnCoop") == 0 )
 		g_iCurrentMode = 1;
@@ -575,7 +579,7 @@ public void GearTransfer_OnWeaponSwap(int client, int target, int itemGiven, int
 //					EVENTS
 // ====================================================================================================
 // L4D1: Block shove when transfer of pills
-public void Event_WeaponGiven(Event event, const char[] name, bool dontBroadcast)
+void Event_WeaponGiven(Event event, const char[] name, bool dontBroadcast)
 {
 	int client = GetClientOfUserId(event.GetInt("giver"));
 	if( client )
@@ -585,7 +589,7 @@ public void Event_WeaponGiven(Event event, const char[] name, bool dontBroadcast
 }
 
 // L4D2: Block shove when transfer of pills/adrenaline
-public void Event_WeaponDrop(Event event, const char[] name, bool dontBroadcast)
+void Event_WeaponDrop(Event event, const char[] name, bool dontBroadcast)
 {
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	if( client )
@@ -599,7 +603,7 @@ public void Event_WeaponDrop(Event event, const char[] name, bool dontBroadcast)
 	}
 }
 
-public void Event_PlayerShoved(Event event, const char[] name, bool dontBroadcast)
+void Event_PlayerShoved(Event event, const char[] name, bool dontBroadcast)
 {
 	int userid = event.GetInt("userid");
 
@@ -616,6 +620,14 @@ public void Event_PlayerShoved(Event event, const char[] name, bool dontBroadcas
 	}
 
 	int client = event.GetInt("attacker");
+	if( g_hCvarKey.IntValue == 2 )
+	{
+		int buttons = GetClientButtons(GetClientOfUserId(client));
+		if( buttons & IN_USE != IN_USE )
+		{
+			return;
+		}
+	}
 
 	DataPack hPack = new DataPack();
 	hPack.WriteCell(client);
