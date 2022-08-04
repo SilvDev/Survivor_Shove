@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION 		"1.14"
+#define PLUGIN_VERSION 		"1.15"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+1.15 (04-Aug-2022)
+	- Added cvar "l4d_survivor_shove_vocal_type" to control the type of vocalization. Thanks to "Shadowysn" for adding.
 
 1.14 (14-Jul-2022)
 	- Added cvar "l4d_survivor_shove_keys" to control the keybind used for shoving. Requested by "yabi".
@@ -112,7 +115,7 @@
 #define GAMEDATA			"l4d_survivor_shove"
 
 
-ConVar g_hCvarAllow, g_hCvarMPGameMode, g_hCvarModes, g_hCvarModesOff, g_hCvarModesTog, g_hCvarBots, g_hCvarDelay, g_hCvarFlags, g_hCvarKey, g_hCvarStart, g_hCvarVoca, g_hGearTransferReal;
+ConVar g_hCvarAllow, g_hCvarMPGameMode, g_hCvarModes, g_hCvarModesOff, g_hCvarModesTog, g_hCvarBots, g_hCvarDelay, g_hCvarFlags, g_hCvarKey, g_hCvarStart, g_hCvarVoca, g_hCvarVocaType, g_hGearTransferReal;
 bool g_bCvarAllow, g_bMapStarted, g_bLateLoad, g_bLeft4Dead2, g_bGearTransfer, g_bCanShove[MAXPLAYERS + 1] = {true, ...};
 float g_fTimeout[MAXPLAYERS + 1];
 Handle g_hConfStagger;
@@ -235,6 +238,7 @@ public void OnPluginStart()
 	g_hCvarKey = CreateConVar(		"l4d_survivor_shove_keys",			"1",			"1=Shove. 2=Shove + Use. Which keys to shove players.", CVAR_FLAGS );
 	g_hCvarStart = CreateConVar(	"l4d_survivor_shove_start",			"1",			"0=Off. 1=On. Should shoving be turned on or off for players when they join.", CVAR_FLAGS );
 	g_hCvarVoca = CreateConVar(		"l4d_survivor_shove_vocalize",		"50",			"0=Off. The chance out of 100 for the survivor being shoved to scream.", CVAR_FLAGS );
+	g_hCvarVocaType = CreateConVar(	"l4d_survivor_shove_vocal_type",	"1",			"0=Death scream. 1=Pain scream. The type of vocalization the survivors will do.", CVAR_FLAGS );
 	g_hCvarModes = CreateConVar(	"l4d_survivor_shove_modes",			"",				"Turn on the plugin in these game modes, separate by commas (no spaces). (Empty = all).", CVAR_FLAGS );
 	g_hCvarModesOff = CreateConVar(	"l4d_survivor_shove_modes_off",		"",				"Turn off the plugin in these game modes, separate by commas (no spaces). (Empty = none).", CVAR_FLAGS );
 	g_hCvarModesTog = CreateConVar(	"l4d_survivor_shove_modes_tog",		"0",			"Turn on the plugin in these game modes. 0=All, 1=Coop, 2=Survival, 4=Versus, 8=Scavenge. Add numbers together.", CVAR_FLAGS );
@@ -717,21 +721,44 @@ void OnFramShove(DataPack hPack)
 		int chance = g_hCvarVoca.IntValue;
 		if( chance && GetRandomInt(1, 100) <= chance )
 		{
-			static char model[40];
-
-			// Get survivor model
-			GetEntPropString(target, Prop_Data, "m_ModelName", model, sizeof(model));
-
-			switch( model[29] )
+			switch ( g_hCvarVocaType.IntValue )
 			{
-				case 'c': VocalizeScene(target, g_Coach[GetRandomInt(0, sizeof(g_Coach) - 1)]);
-				case 'b': VocalizeScene(target, g_Nick[GetRandomInt(0, sizeof(g_Nick) - 1)]);
-				case 'h': VocalizeScene(target, g_Ellis[GetRandomInt(0, sizeof(g_Ellis) - 1)]);
-				case 'd': VocalizeScene(target, g_Rochelle[GetRandomInt(0, sizeof(g_Rochelle) - 1)]);
-				case 'v': VocalizeScene(target, g_Bill[GetRandomInt(0, sizeof(g_Bill) - 1)]);
-				case 'e': VocalizeScene(target, g_Francis[GetRandomInt(0, sizeof(g_Francis) - 1)]);
-				case 'a': VocalizeScene(target, g_Louis[GetRandomInt(0, sizeof(g_Louis) - 1)]);
-				case 'n': VocalizeScene(target, g_Zoey[GetRandomInt(0, sizeof(g_Zoey) - 1)]);
+				case 1:
+				{
+					int health = GetClientHealth(target);
+					if( health < 40 )
+					{
+						SetVariantString("PainLevel:Major:0.1");
+					}
+					else
+					{
+						SetVariantString("PainLevel:Minor:0.1");
+					}
+
+					AcceptEntityInput(target, "AddContext");
+
+					SetVariantString("Pain");
+					AcceptEntityInput(target, "SpeakResponseConcept");
+				}
+				default:
+				{
+					static char model[40];
+
+					// Get survivor model
+					GetEntPropString(target, Prop_Data, "m_ModelName", model, sizeof(model));
+
+					switch( model[29] )
+					{
+						case 'c': VocalizeScene(target, g_Coach[GetRandomInt(0, sizeof(g_Coach) - 1)]);
+						case 'b': VocalizeScene(target, g_Nick[GetRandomInt(0, sizeof(g_Nick) - 1)]);
+						case 'h': VocalizeScene(target, g_Ellis[GetRandomInt(0, sizeof(g_Ellis) - 1)]);
+						case 'd': VocalizeScene(target, g_Rochelle[GetRandomInt(0, sizeof(g_Rochelle) - 1)]);
+						case 'v': VocalizeScene(target, g_Bill[GetRandomInt(0, sizeof(g_Bill) - 1)]);
+						case 'e': VocalizeScene(target, g_Francis[GetRandomInt(0, sizeof(g_Francis) - 1)]);
+						case 'a': VocalizeScene(target, g_Louis[GetRandomInt(0, sizeof(g_Louis) - 1)]);
+						case 'n': VocalizeScene(target, g_Zoey[GetRandomInt(0, sizeof(g_Zoey) - 1)]);
+					}
+				}
 			}
 		}
 	}
