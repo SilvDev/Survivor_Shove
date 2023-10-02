@@ -1,6 +1,6 @@
 /*
 *	Survivor Shove
-*	Copyright (C) 2022 Silvers
+*	Copyright (C) 2023 Silvers
 *
 *	This program is free software: you can redistribute it and/or modify
 *	it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION 		"1.15"
+#define PLUGIN_VERSION 		"1.16"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+1.16 (02-Oct-2023)
+	- Changed cvar "l4d_survivor_shove_bots" to allow setting bots to not push humans. Requested by "Automage".
 
 1.15 (04-Aug-2022)
 	- Added cvar "l4d_survivor_shove_vocal_type" to control the type of vocalization. Thanks to "Shadowysn" for adding.
@@ -136,6 +139,13 @@ enum
 	TYPE_DEFIB	= (1<<8)
 }
 
+enum
+{
+	ONLY_BOTS	= (1<<0),
+	ONLY_HUMAN	= (1<<1),
+	ONLY_FOUR	= (1<<2)
+}
+
 
 
 // Vocalize for Left 4 Dead2
@@ -232,7 +242,7 @@ public void OnPluginStart()
 
 	// CVARS
 	g_hCvarAllow = CreateConVar(	"l4d_survivor_shove_allow",			"1",			"0=Plugin off, 1=Plugin on.", CVAR_FLAGS );
-	g_hCvarBots = CreateConVar(		"l4d_survivor_shove_bots",			"0",			"Who can be shoved. 0=Everyone. 1=Bots only. 2-Humans only.", CVAR_FLAGS );
+	g_hCvarBots = CreateConVar(		"l4d_survivor_shove_bots",			"0",			"Who can be shoved. 0=Everyone. 1=Bots only. 2-Humans only. 4=Bots cannot push humans. Add numbers together (7 will block all).", CVAR_FLAGS );
 	g_hCvarDelay = CreateConVar(	"l4d_survivor_shove_delay",			"0",			"0=No timeout. How many seconds until someone can shove again.", CVAR_FLAGS, true, 0.0 );
 	g_hCvarFlags = CreateConVar(	"l4d_survivor_shove_flags",			"z",			"Empty string = All. Players with one of these flags have access to the shove feature.", CVAR_FLAGS );
 	g_hCvarKey = CreateConVar(		"l4d_survivor_shove_keys",			"1",			"1=Shove. 2=Shove + Use. Which keys to shove players.", CVAR_FLAGS );
@@ -609,24 +619,26 @@ void Event_WeaponDrop(Event event, const char[] name, bool dontBroadcast)
 
 void Event_PlayerShoved(Event event, const char[] name, bool dontBroadcast)
 {
-	int userid = event.GetInt("userid");
+	int user_target = event.GetInt("userid");
+	int user_client = event.GetInt("attacker");
+	int client = GetClientOfUserId(user_client);
 
 	int bots = g_hCvarBots.IntValue;
 	if( bots )
 	{
-		int target = GetClientOfUserId(userid);
+		int target = GetClientOfUserId(user_target);
 		if( IsFakeClient(target) )
 		{
-			if( bots == 2 ) return; // Humans only
+			if( bots & ONLY_HUMAN ) return; // Push humans only
 		} else {
-			if( bots == 1 ) return; // Bots only
+			if( bots & ONLY_BOTS ) return; // Push bots only
+			if( bots & ONLY_FOUR && IsFakeClient(client) ) return; // Bots cannot push humans
 		}
 	}
 
-	int client = event.GetInt("attacker");
 	if( g_hCvarKey.IntValue == 2 )
 	{
-		int buttons = GetClientButtons(GetClientOfUserId(client));
+		int buttons = GetClientButtons(client);
 		if( buttons & IN_USE != IN_USE )
 		{
 			return;
@@ -634,8 +646,8 @@ void Event_PlayerShoved(Event event, const char[] name, bool dontBroadcast)
 	}
 
 	DataPack hPack = new DataPack();
-	hPack.WriteCell(client);
-	hPack.WriteCell(userid);
+	hPack.WriteCell(user_client);
+	hPack.WriteCell(user_target);
 
 	RequestFrame(OnFramShove, hPack);
 }
